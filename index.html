@@ -3,97 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFC Web Management Suite (Demo 2)</title>
+    <title>NFC Web Application Interface</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #F3F4F6;
-            margin: 0;
-            padding: 2rem;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: #FFFFFF;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .header {
-            margin-bottom: 1.5rem;
-            border-bottom: 1px solid #E5E7EB;
-            padding-bottom: 1rem;
-        }
-        .controls {
-            margin-bottom: 1.5rem;
-            display: flex;
-            gap: 1rem;
-        }
-        button {
-            padding: 0.5rem 1rem;
-            font-size: 1rem;
-            font-weight: 600;
-            color: #FFFFFF;
-            background-color: #2563EB;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        button:hover { background-color: #1D4ED8; }
-        button:disabled { background-color: #9CA3AF; cursor: not-allowed; }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 1.5rem;
-        }
-        th, td {
-            padding: 0.75rem;
-            text-align: left;
-            border-bottom: 1px solid #E5E7EB;
-        }
-        th { background-color: #F9FAFB; font-weight: 600; }
-        .log-console {
-            background-color: #1F2937;
-            color: #10B981;
-            padding: 1rem;
-            height: 200px;
-            overflow-y: auto;
-            font-family: 'Consolas', monospace;
-            font-size: 0.875rem;
-            border-radius: 4px;
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .panel { border: 1px solid #ddd; padding: 20px; margin-bottom: 20px; border-radius: 5px; background-color: #f9f9f9; }
+        .console { background-color: #1e1e1e; color: #4af626; font-family: monospace; padding: 15px; height: 250px; overflow-y: auto; border-radius: 3px; font-size: 14px; }
+        button { padding: 10px 15px; margin-right: 10px; cursor: pointer; border: none; background-color: #0056b3; color: white; border-radius: 3px; font-weight: bold; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        input[type="text"] { padding: 8px; width: 150px; margin-right: 10px; border: 1px solid #ccc; border-radius: 3px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #e9ecef; }
+        hr { border: 0; border-top: 1px solid #ddd; margin: 20px 0; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h2>NFC Web Application Interface</h2>
-            <p>Utilizing Web Serial API for PN532 UART Communication</p>
+        <h2>NFC Web Application Interface</h2>
+        
+        <div class="panel">
+            <h4>Hardware Connection</h4>
+            <button id="btnConnect">Connect Reader</button>
+            <button id="btnRead" disabled>Read Tag</button>
         </div>
 
-        <div class="controls">
-            <button id="btn-connect">Connect Reader</button>
-            <button id="btn-detect" disabled>Detect TAG</button>
+        <div class="panel">
+            <h4>NFC Data Writer (NTAG2xx Series)</h4>
+            <label for="inputData">Data (Exactly 4 chars):</label>
+            <input type="text" id="inputData" maxlength="4" placeholder="TEXT">
+            <button id="btnWrite" disabled>Write to Tag</button>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Target ID</th>
-                    <th>UID</th>
-                    <th>Standard</th>
-                </tr>
-            </thead>
-            <tbody id="table-body">
-                <tr>
-                    <td colspan="3" style="text-align: center; color: #6B7280;">No tags detected.</td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="panel">
+            <h4>Target Information</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target ID</th>
+                        <th>UID (Hex)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tagTableBody">
+                    <tr>
+                        <td colspan="3">No tag detected. Please connect the reader and scan.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
-        <div class="log-console" id="log-console">
-            System Initialized. Awaiting hardware connection...<br>
+        <div class="panel">
+            <h4>System Log</h4>
+            <div id="logConsole" class="console"></div>
         </div>
     </div>
     <script src="app.js"></script>
