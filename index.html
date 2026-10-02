@@ -3,44 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFC Web Management Suite (Demo 2 - Refactored)</title>
+    <title>NFC Web Management Suite (Demo 2)</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F3F4F6; margin: 0; padding: 2rem; }
-        .container { max-width: 800px; margin: 0 auto; background-color: #FFFFFF; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-        .header { margin-bottom: 1.5rem; border-bottom: 1px solid #E5E7EB; padding-bottom: 1rem; }
-        .controls, .write-section { margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; }
-        button { padding: 0.5rem 1rem; font-size: 1rem; font-weight: 600; color: #FFFFFF; background-color: #2563EB; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F3F4F6;
+            margin: 0;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #FFFFFF;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #E5E7EB;
+            padding-bottom: 1rem;
+        }
+        .controls {
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #FFFFFF;
+            background-color: #2563EB;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
         button:hover { background-color: #1D4ED8; }
         button:disabled { background-color: #9CA3AF; cursor: not-allowed; }
-        select, input[type="text"] { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
-        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #E5E7EB; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+        }
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #E5E7EB;
+        }
         th { background-color: #F9FAFB; font-weight: 600; }
-        .log-console { background-color: #1F2937; color: #10B981; padding: 1rem; height: 200px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 0.875rem; border-radius: 4px; }
-        hr { border: 0; border-top: 1px solid #E5E7EB; margin: 1.5rem 0; }
+        .log-console {
+            background-color: #1F2937;
+            color: #10B981;
+            padding: 1rem;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 0.875rem;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h2>NFC Web Application Interface</h2>
-            <p>Utilizing Web Serial API for PN532 UART Communication (Modularized)</p>
+            <p>Utilizing Web Serial API for PN532 UART Communication</p>
         </div>
 
-        <!-- Section 1: Hardware Connection -->
         <div class="controls">
-            <select id="baud-rate">
-                <option value="9600">9600 bps</option>
-                <option value="115200" selected>115200 bps (PN532 Default)</option>
-            </select>
             <button id="btn-connect">Connect Reader</button>
             <button id="btn-detect" disabled>Detect TAG</button>
-        </div>
-
-        <!-- Section 2: Write Feature -->
-        <div class="write-section">
-            <input type="text" id="input-data" maxlength="4" placeholder="Text (Max 4 chars)" disabled>
-            <button id="btn-write" disabled>Write to TAG (Page 4)</button>
         </div>
 
         <table>
@@ -62,9 +96,6 @@
             System Initialized. Awaiting hardware connection...<br>
         </div>
     </div>
-    
-    <!-- Import Library First, then Main App -->
-    <script src="pn532-lib.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
