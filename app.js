@@ -45,7 +45,19 @@ async function connectHardware() {
         btnConnect.innerText = "Connected";
         btnAutoDetect.disabled = false;
 
+        // 1. เริ่มลูปรอรับข้อมูลก่อน
         startReadLoop();
+
+        // 2. ส่งคำสั่งปลุกบอร์ด (SAM Configuration) เพื่อเปิดเสาอากาศ
+        setTimeout(async () => {
+            appendLog("[System] Waking up PN532 (SAM Configuration)...");
+            const SAM_WAKEUP = new Uint8Array([
+                0x55, 0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 
+                0xFF, 0x03, 0xFD, 0xD4, 0x14, 0x01, 0x17, 0x00
+            ]);
+            await transmitRaw(SAM_WAKEUP, false);
+        }, 500); // หน่วงเวลาเล็กน้อยให้พอร์ตเสถียรก่อนยิงคำสั่ง
+
     } catch (error) {
         appendLog(`[Error] Connection: ${error.message}`);
     }
