@@ -14,6 +14,8 @@
         button:disabled { background-color: #9CA3AF; cursor: not-allowed; }
         .btn-stop { background-color: #DC2626; }
         .btn-stop:hover { background-color: #B91C1C; }
+        .btn-disconnect { background-color: #6B7280; }
+        .btn-disconnect:hover { background-color: #4B5563; }
         select, input[type="text"] { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
         th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #E5E7EB; }
@@ -25,7 +27,7 @@
     <div class="container">
         <div class="header">
             <h2>NFC Web Application Interface</h2>
-            <p>Utilizing Web Serial API (Auto-Polling Mode)</p>
+            <p>Utilizing Web Serial API (Auto-Polling & Disconnect Features)</p>
         </div>
 
         <div class="controls">
@@ -34,6 +36,7 @@
                 <option value="115200" selected>115200 bps</option>
             </select>
             <button id="btn-connect">Connect Reader</button>
+            <button id="btn-disconnect" class="btn-disconnect" disabled>Disconnect</button>
             <button id="btn-autodetect" disabled>Start Auto-Scan</button>
         </div>
 

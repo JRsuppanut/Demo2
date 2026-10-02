@@ -4,6 +4,7 @@
  */
 
 const btnConnect = document.getElementById('btn-connect');
+const btnDisconnect = document.getElementById('btn-disconnect');
 const btnAutoDetect = document.getElementById('btn-autodetect');
 const btnWrite = document.getElementById('btn-write');
 const inputData = document.getElementById('input-data');
@@ -30,6 +31,9 @@ function toHexStr(buffer) {
     return Array.from(buffer).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
 }
 
+// ---------------------------------------------------------
+// 1. Connection & Hardware Configuration
+// ---------------------------------------------------------
 async function connectHardware() {
     try {
         if (!('serial' in navigator)) throw new Error("Web Serial API is not supported.");
@@ -40,14 +44,16 @@ async function connectHardware() {
 
         appendLog(`[Hardware] Connected at ${selectedBaudRate} bps.`);
         
+        // อัปเดต UI เมื่อเชื่อมต่อสำเร็จ
         btnConnect.disabled = true;
         baudRateSelect.disabled = true;
         btnConnect.innerText = "Connected";
+        btnDisconnect.disabled = false;
 
-        // 1. เริ่ม Read Loop ทันทีเพื่อรอรับสัญญาณตอบกลับ
+        // เริ่ม Read Loop
         startReadLoop();
 
-        // 2. ส่งคำสั่งปลุกบอร์ดแบบดุดัน (Aggressive Wakeup & SAM Config)
+        // ขั้นตอนที่ 1: ปลุกบอร์ด (SAM Configuration)
         appendLog("[System] Waking up PN532 (SAM Configuration)...");
         const SAM_WAKEUP = new Uint8Array([
             0x55, 0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -55,8 +61,14 @@ async function connectHardware() {
         ]);
         await transmitRaw(SAM_WAKEUP, false);
 
-        // รอฮาร์ดแวร์ตื่นแป๊บนึง ก่อนปลดล็อกปุ่ม Scan
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 100));
+
+        // ขั้นตอนที่ 2: ตั้งค่า MaxRetries = 0 (เพื่อให้ระบบส่งค่า "บัตรหาย" ได้ทันทีที่ยกขึ้น)
+        appendLog("[System] Configuring RF (Setting MaxRetries to 0)...");
+        const RF_CONFIG = PN532.buildFrame([0xD4, 0x32, 0x05, 0xFF, 0x01, 0x00]);
+        await transmitRaw(RF_CONFIG, false);
+
+        await new Promise(r => setTimeout(r, 200));
         btnAutoDetect.disabled = false;
 
     } catch (error) {
@@ -64,6 +76,52 @@ async function connectHardware() {
     }
 }
 
+// ---------------------------------------------------------
+// 2. Disconnect Feature
+// ---------------------------------------------------------
+async function disconnectHardware() {
+    try {
+        // 1. หยุดลูป Auto-Scan ถ้ารันอยู่
+        if (isAutoScanning) {
+            toggleAutoScan();
+        }
+
+        // 2. ปิด Reader
+        if (reader) {
+            await reader.cancel(); // บังคับให้ reader.read() หลุดจากลูปทันที
+        }
+
+        // 3. ปิดพอร์ตเชื่อมต่อ
+        if (serialPort) {
+            await serialPort.close();
+            serialPort = null;
+        }
+
+        appendLog("🔌 [System] Hardware disconnected.");
+
+        // 4. รีเซ็ต UI ทั้งหมดกลับสู่สถานะเริ่มต้น
+        btnConnect.disabled = false;
+        baudRateSelect.disabled = false;
+        btnConnect.innerText = "Connect Reader";
+        btnDisconnect.disabled = true;
+        btnAutoDetect.disabled = true;
+        btnWrite.disabled = true;
+        inputData.disabled = true;
+
+        tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #6B7280;">Awaiting connection...</td></tr>`;
+
+        // 5. รีเซ็ต State
+        currentTargetId = null;
+        lastDetectedUid = null;
+
+    } catch (error) {
+        appendLog(`[Error] Disconnect: ${error.message}`);
+    }
+}
+
+// ---------------------------------------------------------
+// 3. Data Transmission & Parsing
+// ---------------------------------------------------------
 async function transmitRaw(payloadUint8Array, silent = false) {
     if (!serialPort || !serialPort.writable) return;
     writer = serialPort.writable.getWriter();
@@ -83,7 +141,7 @@ async function startReadLoop() {
     try {
         while (true) {
             const { value, done } = await reader.read();
-            if (done) break;
+            if (done) break; // หลุดจากลูปทันทีเมื่อกดปุ่ม Disconnect
             if (value) {
                 if (!isAutoScanning) appendLog(`RX <- ${toHexStr(value)}`);
                 parseNfcResponse(value);
@@ -98,11 +156,15 @@ async function startReadLoop() {
 
 function parseNfcResponse(dataBytes) {
     for (let i = 0; i < dataBytes.length - 5; i++) {
-        // SAM Config ACK (ตรวจจับว่าบอร์ดตื่นแล้ว)
+        // SAM Config ACK 
         if (dataBytes[i] === 0xD5 && dataBytes[i+1] === 0x15) {
-            appendLog("✅ [System] PN532 is AWAKE and Ready!");
+            appendLog("✅ [System] PN532 is AWAKE!");
         }
-        // ตรวจพบบัตร (0xD5 0x4B)
+        // RF Config ACK
+        else if (dataBytes[i] === 0xD5 && dataBytes[i+1] === 0x33) {
+            appendLog("⚙️ [System] RF Settings Optimized (Fast Polling)");
+        }
+        // ตรวจพบ / ไม่พบบัตร (0xD5 0x4B)
         else if (dataBytes[i] === 0xD5 && dataBytes[i+1] === 0x4B) {
             const nbTg = dataBytes[i+2]; 
             
@@ -125,6 +187,7 @@ function parseNfcResponse(dataBytes) {
                     btnWrite.disabled = false;
                 }
             } else {
+                // หาก MaxRetries = 0 ทำงานสำเร็จ เมื่อไม่เจอบัตร มันจะส่ง nbTg = 0 มาเข้าเงื่อนไขนี้ทันที
                 if (lastDetectedUid !== null) {
                     appendLog(`⚪ [REMOVE] Tag removed from reader.`);
                     lastDetectedUid = null; 
@@ -142,11 +205,14 @@ function parseNfcResponse(dataBytes) {
     }
 }
 
+// ---------------------------------------------------------
+// 4. Polling Loop & Actions
+// ---------------------------------------------------------
 async function autoPollLoop() {
     while (isAutoScanning && serialPort && serialPort.writable) {
         const detectFrame = PN532.getDetectFrame();
         await transmitRaw(detectFrame, true); 
-        await new Promise(r => setTimeout(r, 600)); 
+        await new Promise(r => setTimeout(r, 500)); // เช็คทุกๆ ครึ่งวินาที
     }
 }
 
@@ -174,10 +240,14 @@ async function triggerWrite() {
     const textEncoder = new TextEncoder();
     const dataBytes = Array.from(textEncoder.encode(textValue));
     appendLog(`[Action] Writing to Page 4: "${textValue}"...`);
+    
     const writeFrame = PN532.getWriteNtagFrame(currentTargetId, 0x04, dataBytes);
+    
     const wasScanning = isAutoScanning;
     if (wasScanning) isAutoScanning = false; 
+    
     await transmitRaw(writeFrame, false); 
+    
     if (wasScanning) {
         setTimeout(() => {
             isAutoScanning = true;
@@ -186,6 +256,10 @@ async function triggerWrite() {
     }
 }
 
+// ---------------------------------------------------------
+// Event Listeners
+// ---------------------------------------------------------
 btnConnect.addEventListener('click', connectHardware);
+btnDisconnect.addEventListener('click', disconnectHardware);
 btnAutoDetect.addEventListener('click', toggleAutoScan);
 btnWrite.addEventListener('click', triggerWrite);
