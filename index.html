@@ -3,69 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFC Web Management Suite (Demo 2 - Production)</title>
+    <title>NFC Web Management - Technology Demo</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F3F4F6; margin: 0; padding: 2rem; }
-        .container { max-width: 800px; margin: 0 auto; background-color: #FFFFFF; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-        .header { margin-bottom: 1.5rem; border-bottom: 1px solid #E5E7EB; padding-bottom: 1rem; }
-        .controls, .write-section { margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; }
-        button { padding: 0.5rem 1rem; font-size: 1rem; font-weight: 600; color: #FFFFFF; background-color: #2563EB; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
-        button:hover { background-color: #1D4ED8; }
-        button:disabled { background-color: #9CA3AF; cursor: not-allowed; }
-        .btn-stop { background-color: #DC2626; }
-        .btn-stop:hover { background-color: #B91C1C; }
-        .btn-disconnect { background-color: #6B7280; }
-        .btn-disconnect:hover { background-color: #4B5563; }
-        select, input[type="text"] { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
-        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #E5E7EB; }
-        th { background-color: #F9FAFB; font-weight: 600; }
-        .log-console { background-color: #1F2937; color: #10B981; padding: 1rem; height: 250px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 0.875rem; border-radius: 4px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #F3F4F6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { text-align: center; background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { color: #1F2937; margin-bottom: 0.5rem; }
+        p { color: #6B7280; margin-bottom: 2rem; }
+        .btn-group { display: flex; gap: 1rem; justify-content: center; }
+        a { text-decoration: none; padding: 1rem 2rem; border-radius: 8px; font-weight: bold; color: white; transition: 0.2s; }
+        .btn-serial { background-color: #2563EB; }
+        .btn-serial:hover { background-color: #1D4ED8; }
+        .btn-usb { background-color: #059669; }
+        .btn-usb:hover { background-color: #047857; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h2>NFC Web Application Interface</h2>
-            <p>Utilizing Web Serial API (Auto-Polling & Disconnect Features)</p>
-        </div>
-
-        <div class="controls">
-            <select id="baud-rate">
-                <option value="9600">9600 bps</option>
-                <option value="115200" selected>115200 bps</option>
-            </select>
-            <button id="btn-connect">Connect Reader</button>
-            <button id="btn-disconnect" class="btn-disconnect" disabled>Disconnect</button>
-            <button id="btn-autodetect" disabled>Start Auto-Scan</button>
-        </div>
-
-        <div class="write-section">
-            <input type="text" id="input-data" maxlength="4" placeholder="Text (Max 4 chars)" disabled>
-            <button id="btn-write" disabled>Write to TAG (Page 4)</button>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Target ID</th>
-                    <th>UID</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="table-body">
-                <tr>
-                    <td colspan="3" style="text-align: center; color: #6B7280;">Awaiting connection...</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <div class="log-console" id="log-console">
-            [SYSTEM] Initialized. Awaiting hardware connection...<br>
+        <h1>NFC Web Management Suite</h1>
+        <p>Select the communication protocol for the demonstration</p>
+        <div class="btn-group">
+            <a href="serial/index.html" class="btn-serial">Standard (Web Serial API)</a>
+            <a href="usb/index.html" class="btn-usb">Experimental (WebUSB API)</a>
         </div>
     </div>
-    
-    <script src="pn532-lib.js"></script>
-    <script src="app.js"></script>
 </body>
 </html>
