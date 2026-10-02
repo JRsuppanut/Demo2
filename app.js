@@ -1,10 +1,10 @@
 /**
  * Module: app.js
- * Description: UI Event handling, Web Serial stream management, and Data Parsing.
+ * Description: UI Event handling, Web Serial Auto-Polling, and Anti-collision Logic.
  */
 
 const btnConnect = document.getElementById('btn-connect');
-const btnDetect = document.getElementById('btn-detect');
+const btnAutoDetect = document.getElementById('btn-autodetect');
 const btnWrite = document.getElementById('btn-write');
 const inputData = document.getElementById('input-data');
 const baudRateSelect = document.getElementById('baud-rate');
@@ -14,10 +14,14 @@ const tableBody = document.getElementById('table-body');
 let serialPort;
 let reader;
 let writer;
+
+// State Management Variables
 let currentTargetId = null;
+let lastDetectedUid = null; // จดจำ UID ล่าสุดเพื่อกันการอ่านรัวๆ
+let isAutoScanning = false; // สถานะการทำงานของลูป
 
 function appendLog(message) {
-    const timestamp = new Date().toLocaleTimeString();
+    const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
     logConsole.innerHTML += `[${timestamp}] ${message}<br>`;
     logConsole.scrollTop = logConsole.scrollHeight;
 }
@@ -26,37 +30,36 @@ function toHexStr(buffer) {
     return Array.from(buffer).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
 }
 
-// 1. Updated Connection with dynamic Baud Rate
 async function connectHardware() {
     try {
         if (!('serial' in navigator)) throw new Error("Web Serial API is not supported.");
-
         const selectedBaudRate = parseInt(baudRateSelect.value);
         
         serialPort = await navigator.serial.requestPort();
         await serialPort.open({ baudRate: selectedBaudRate });
 
-        appendLog(`Hardware connected. Port opened at ${selectedBaudRate} bps.`);
+        appendLog(`[Hardware] Connected at ${selectedBaudRate} bps.`);
         
         btnConnect.disabled = true;
         baudRateSelect.disabled = true;
         btnConnect.innerText = "Connected";
-        btnDetect.disabled = false;
+        btnAutoDetect.disabled = false;
 
         startReadLoop();
     } catch (error) {
-        appendLog(`Connection Error: ${error.message}`);
+        appendLog(`[Error] Connection: ${error.message}`);
     }
 }
 
-async function transmitRaw(payloadUint8Array) {
+// เพิ่มพารามิเตอร์ 'silent' เพื่อซ่อน Log เวลาลูปทำงาน จะได้ไม่รกหน้าจอ
+async function transmitRaw(payloadUint8Array, silent = false) {
     if (!serialPort || !serialPort.writable) return;
     writer = serialPort.writable.getWriter();
     try {
         await writer.write(payloadUint8Array);
-        appendLog(`TX -> ${toHexStr(payloadUint8Array)}`);
+        if (!silent) appendLog(`TX -> ${toHexStr(payloadUint8Array)}`);
     } catch (error) {
-        appendLog(`TX Error: ${error.message}`);
+        appendLog(`[Error] TX: ${error.message}`);
     } finally {
         writer.releaseLock();
     }
@@ -70,69 +73,130 @@ async function startReadLoop() {
             const { value, done } = await reader.read();
             if (done) break;
             if (value) {
-                appendLog(`RX <- ${toHexStr(value)}`);
+                // หากกำลัง Write ให้โชว์ RX แต่ถ้าลูปค้นหาปกติ ให้ซ่อนไว้เพื่อความสะอาด
+                if (!isAutoScanning) appendLog(`RX <- ${toHexStr(value)}`);
                 parseNfcResponse(value);
             }
         }
     } catch (error) {
-        appendLog(`RX Error: ${error.message}`);
+        appendLog(`[Error] RX: ${error.message}`);
     } finally {
         reader.releaseLock();
     }
 }
 
-// 2. Parsed response handling
+// Logic หลักสำหรับตรวจจับและแยกแยะบัตร
 function parseNfcResponse(dataBytes) {
     for (let i = 0; i < dataBytes.length - 5; i++) {
-        // Detect 'InListPassiveTarget' Success Response (0xD5 0x4B)
+        // เงื่อนไข: ฮาร์ดแวร์ตอบกลับคำสั่งค้นหาบัตรสำเร็จ (0xD5 0x4B)
         if (dataBytes[i] === 0xD5 && dataBytes[i+1] === 0x4B) {
-            if (dataBytes[i+2] > 0) {
+            const nbTg = dataBytes[i+2]; // จำนวนบัตรที่พบ
+            
+            if (nbTg > 0) {
+                // พบทาร์เก็ต
                 let idx = i + 3;
-                currentTargetId = dataBytes[idx]; // Store Target ID for writing
+                currentTargetId = dataBytes[idx]; 
                 const nfcidLen = dataBytes[idx+4];
                 const uidBytes = dataBytes.slice(idx + 5, idx + 5 + nfcidLen);
                 const uidStr = Array.from(uidBytes).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('');
 
-                tableBody.innerHTML = `<tr><td>0x0${currentTargetId}</td><td>${uidStr}</td><td>ISO 14443-A</td></tr>`;
-                appendLog(`Detected Tag UID: ${uidStr}`);
-                
-                // Enable Write UI
-                inputData.disabled = false;
-                btnWrite.disabled = false;
+                // Check State: ถ้า UID ไม่ตรงกับของเดิม (แปลว่าเป็นบัตรใบใหม่ หรือเพิ่งวางลงไป)
+                if (uidStr !== lastDetectedUid) {
+                    lastDetectedUid = uidStr; // จำเอาไว้ว่าอ่านใบนี้ไปแล้ว
+                    
+                    tableBody.innerHTML = `<tr>
+                        <td style="color: #2563EB; font-weight: bold;">0x0${currentTargetId}</td>
+                        <td style="color: #2563EB; font-weight: bold;">${uidStr}</td>
+                        <td>Active</td>
+                    </tr>`;
+                    
+                    appendLog(`🔵 [TAP] Tag Detected! UID: ${uidStr}`);
+                    
+                    inputData.disabled = false;
+                    btnWrite.disabled = false;
+                }
+            } else {
+                // nbTg === 0 หมายถึงไม่มีบัตรในรัศมี
+                // Check State: ถ้าเคยมีบัตรอยู่ แล้วตอนนี้หายไป ให้ทำการ Reset สถานะ
+                if (lastDetectedUid !== null) {
+                    appendLog(`⚪ [REMOVE] Tag removed from reader.`);
+                    
+                    lastDetectedUid = null; // เคลียร์ความจำ เพื่อให้บัตรเดิมแตะซ้ำได้
+                    currentTargetId = null;
+                    
+                    tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #6B7280;">Ready for next tap...</td></tr>`;
+                    inputData.disabled = true;
+                    btnWrite.disabled = true;
+                }
             }
         }
-        // Detect 'InDataExchange' Write Success Response (0xD5 0x41 0x00)
+        // เงื่อนไข: เขียนข้อมูลสำเร็จ
         else if (dataBytes[i] === 0xD5 && dataBytes[i+1] === 0x41 && dataBytes[i+2] === 0x00) {
-            appendLog("Success: Data written to NTAG successfully.");
+            appendLog("✅ [SUCCESS] Data written to NTAG successfully.");
         }
     }
 }
 
-// 3. Updated Trigger using Library
-async function triggerDetection() {
-    appendLog("Executing InListPassiveTarget command...");
-    const detectFrame = PN532.getDetectFrame(); // Use Library
-    await transmitRaw(detectFrame);
+// Asynchronous Polling Loop (ยิงคำสั่งค้นหาอัตโนมัติ)
+async function autoPollLoop() {
+    while (isAutoScanning && serialPort && serialPort.writable) {
+        const detectFrame = PN532.getDetectFrame();
+        await transmitRaw(detectFrame, true); // ส่งแบบ Silent ปิดการโชว์ TX ขยะ
+        await new Promise(r => setTimeout(r, 600)); // หน่วงเวลา 600ms (ค้นหา 1.5 รอบ/วินาที)
+    }
 }
 
-// 4. New Write Feature
+// ควบคุมการเปิด/ปิดโหมด Auto-Scan
+function toggleAutoScan() {
+    if (isAutoScanning) {
+        // กดปิด
+        isAutoScanning = false;
+        btnAutoDetect.innerText = "Start Auto-Scan";
+        btnAutoDetect.classList.remove('btn-stop');
+        appendLog("[System] Auto-Scan Paused.");
+    } else {
+        // กดเปิด
+        isAutoScanning = true;
+        btnAutoDetect.innerText = "Stop Auto-Scan";
+        btnAutoDetect.classList.add('btn-stop');
+        appendLog("[System] Auto-Scan Started. You can tap the tag now.");
+        
+        // เคลียร์ตารางและเริ่มลูป
+        tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #6B7280;">Ready for next tap...</td></tr>`;
+        autoPollLoop();
+    }
+}
+
 async function triggerWrite() {
     if (currentTargetId === null) {
-        appendLog("Error: No tag detected. Please detect a tag first.");
+        appendLog("[Error] No active tag to write.");
         return;
     }
 
     let textValue = inputData.value;
-    if (textValue.length < 4) textValue = textValue.padEnd(4, ' '); // Pad with spaces if less than 4 chars
+    if (textValue.length < 4) textValue = textValue.padEnd(4, ' '); 
 
     const textEncoder = new TextEncoder();
-    const dataBytes = Array.from(textEncoder.encode(textValue)); // Convert text to byte array
+    const dataBytes = Array.from(textEncoder.encode(textValue));
 
-    appendLog(`Executing Write command to Page 4 with data: "${textValue}"...`);
-    const writeFrame = PN532.getWriteNtagFrame(currentTargetId, 0x04, dataBytes); // Use Library
-    await transmitRaw(writeFrame);
+    appendLog(`[Action] Writing to Page 4: "${textValue}"...`);
+    const writeFrame = PN532.getWriteNtagFrame(currentTargetId, 0x04, dataBytes);
+    
+    // หยุด Auto-Scan ชั่วคราวก่อนเขียน เพื่อไม่ให้คำสั่งชนกัน
+    const wasScanning = isAutoScanning;
+    if (wasScanning) isAutoScanning = false; 
+
+    await transmitRaw(writeFrame, false); // แสดง TX ตอนเขียน
+    
+    // กลับมาสแกนต่อหลังจากเขียนเสร็จ
+    if (wasScanning) {
+        setTimeout(() => {
+            isAutoScanning = true;
+            autoPollLoop();
+        }, 1000);
+    }
 }
 
 btnConnect.addEventListener('click', connectHardware);
-btnDetect.addEventListener('click', triggerDetection);
+btnAutoDetect.addEventListener('click', toggleAutoScan);
 btnWrite.addEventListener('click', triggerWrite);
